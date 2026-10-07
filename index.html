@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expense Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+    padding: 20px;
+  }
+  .container { max-width: 1000px; margin: 0 auto; }
+  h1 { text-align: center; margin-bottom: 20px; color: #4f46e5; }
+  h2 { font-size: 18px; margin-bottom: 12px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .card small { color: #64748b; display: block; margin-bottom: 6px; }
+  .card .value { font-size: 26px; font-weight: 700; }
+  .over { color: #dc2626; }
+  .ok { color: #16a34a; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 20px; }
+
+  label { display: block; font-size: 13px; color: #475569; margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+  input:focus, select:focus { outline: 2px solid #818cf8; border-color: transparent; }
+  button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; }
+  .btn-primary { background: #4f46e5; color: #fff; width: 100%; margin-top: 16px; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-small { background: #e0e7ff; color: #3730a3; }
+  .btn-del { background: #fee2e2; color: #b91c1c; padding: 6px 10px; }
+  .row { display: flex; gap: 10px; align-items: end; }
+  .row > div { flex: 1; }
+  .row button { margin-bottom: 0; }
+
+  #warning { display: none; background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+  th { color: #64748b; font-size: 12px; text-transform: uppercase; }
+  .amount { text-align: right; font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  .empty { text-align: center; color: #94a3b8; padding: 20px; }
+
+  .bar-row { margin-bottom: 12px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .bar-bg { background: #e2e8f0; height: 10px; border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #6366f1; border-radius: 6px; transition: width .4s; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>💰 Expense Tracker</h1>
+
+  <div id="warning"></div>
+
+  <!-- Summary cards -->
+  <div class="cards">
+    <div class="card"><small>Total (all time)</small><div class="value" id="totalAll">0.00</div></div>
+    <div class="card"><small>Spent in selected month</small><div class="value" id="totalMonth">0.00</div></div>
+    <div class="card"><small>Monthly budget</small><div class="value" id="budgetShown">Not set</div></div>
+    <div class="card"><small>Remaining</small><div class="value" id="remaining">-</div></div>
+  </div>
+
+  <div class="grid">
+    <!-- Add expense -->
+    <div class="panel">
+      <h2>Add Expense</h2>
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" min="0" step="0.01" placeholder="e.g. 250">
+
+      <label for="category">Category</label>
+      <select id="category">
+        <option>Food</option>
+        <option>Transport</option>
+        <option>Books</option>
+        <option>Entertainment</option>
+        <option>Shopping</option>
+        <option>Other</option>
+      </select>
+
+      <label for="description">Description</label>
+      <input type="text" id="description" placeholder="e.g. Lunch at canteen">
+
+      <label for="date">Date</label>
+      <input type="date" id="date">
+
+      <button class="btn-primary" id="addBtn">Add Expense</button>
+    </div>
+
+    <!-- Budget + month filter + summary -->
+    <div>
+      <div class="panel">
+        <h2>Budget & Month</h2>
+        <div class="row">
+          <div>
+            <label for="budget">Monthly budget</label>
+            <input type="number" id="budget" min="0" step="0.01" placeholder="e.g. 5000">
+          </div>
+          <button class="btn-small" id="saveBudget">Save</button>
+        </div>
+        <label for="monthFilter">View month</label>
+        <input type="month" id="monthFilter">
+      </div>
+
+      <div class="panel">
+        <h2>Spending by Category</h2>
+        <div id="categorySummary"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expense list -->
+  <div class="panel">
+    <h2>Expenses (selected month)</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Category</th><th>Description</th><th class="amount">Amount</th><th></th></tr>
+        </thead>
+        <tbody id="expenseBody"></tbody>
+      </table>
+    </div>
+    <button class="btn-small" id="exportBtn" style="margin-top:15px">Export CSV</button>
+  </div>
+</div>
+
+<script>
+  // ---------- Data ----------
+  let expenses = JSON.parse(localStorage.getItem("expenses") || "[]");
+  let budget = parseFloat(localStorage.getItem("budget") || "0");
+
+  function saveExpenses() {
+    localStorage.setItem("expenses", JSON.stringify(expenses));
+  }
+
+  // ---------- Helpers ----------
+  const $ = id => document.getElementById(id);
+  const money = n => Number(n).toFixed(2);
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // ---------- Actions ----------
+  function addExpense() {
+    const amount = parseFloat($("amount").value);
+    const category = $("category").value;
+    const description = $("description").value.trim() || "-";
+    const date = $("date").value || today();
+
+    if (isNaN(amount) || amount <= 0) {
+      alert("Please enter a valid amount greater than 0.");
+      return;
+    }
+
+    expenses.push({ id: Date.now(), amount, category, description, date });
+    saveExpenses();
+
+    $("amount").value = "";
+    $("description").value = "";
+    $("monthFilter").value = date.slice(0, 7); // jump to that expense's month
+    render();
+  }
+
+  function deleteExpense(id) {
+    if (!confirm("Delete this expense?")) return;
+    expenses = expenses.filter(e => e.id !== id);
+    saveExpenses();
+    render();
+  }
+
+  function saveBudget() {
+    const value = parseFloat($("budget").value);
+    budget = isNaN(value) || value < 0 ? 0 : value;
+    localStorage.setItem("budget", budget);
+    render();
+  }
+
+  function exportCSV() {
+    if (expenses.length === 0) { alert("No expenses to export."); return; }
+    const rows = [["Date", "Category", "Description", "Amount"]];
+    expenses.forEach(e => rows.push([e.date, e.category, '"' + e.description.replace(/"/g, '""') + '"', e.amount]));
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "expenses.csv";
+    link.click();
+  }
+
+  // ---------- Rendering ----------
+  function render() {
+    const month = $("monthFilter").value;
+    const monthExpenses = expenses
+      .filter(e => e.date.startsWith(month))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    // Cards
+    const totalAll = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalMonth = monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+    $("totalAll").textContent = money(totalAll);
+    $("totalMonth").textContent = money(totalMonth);
+
+    if (budget > 0) {
+      const left = budget - totalMonth;
+      $("budgetShown").textContent = money(budget);
+      $("remaining").textContent = money(left);
+      $("remaining").className = "value " + (left < 0 ? "over" : "ok");
+    } else {
+      $("budgetShown").textContent = "Not set";
+      $("remaining").textContent = "-";
+      $("remaining").className = "value";
+    }
+
+    // Warning
+    const warning = $("warning");
+    if (budget > 0 && totalMonth > budget) {
+      warning.style.display = "block";
+      warning.textContent = "⚠️ You are over budget for " + month + "! Spent " + money(totalMonth) + " of " + money(budget) + ".";
+    } else {
+      warning.style.display = "none";
+    }
+
+    // Table
+    const body = $("expenseBody");
+    if (monthExpenses.length === 0) {
+      body.innerHTML = '<tr><td colspan="5" class="empty">No expenses for this month.</td></tr>';
+    } else {
+      body.innerHTML = monthExpenses.map(e => `
+        <tr>
+          <td>${e.date}</td>
+          <td>${e.category}</td>
+          <td>${escapeHtml(e.description)}</td>
+          <td class="amount">${money(e.amount)}</td>
+          <td><button class="btn-del" onclick="deleteExpense(${e.id})">Delete</button></td>
+        </tr>`).join("");
+    }
+
+    // Category summary
+    const totals = {};
+    monthExpenses.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; });
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    $("categorySummary").innerHTML = entries.length === 0
+      ? '<div class="empty">Nothing to show yet.</div>'
+      : entries.map(([cat, amt]) => {
+          const percent = (amt / totalMonth * 100).toFixed(1);
+          return `
+            <div class="bar-row">
+              <div class="bar-label"><span>${cat}</span><span>${money(amt)} (${percent}%)</span></div>
+              <div class="bar-bg"><div class="bar-fill" style="width:${percent}%"></div></div>
+            </div>`;
+        }).join("");
+  }
+
+  // ---------- Setup ----------
+  $("date").value = today();
+  $("monthFilter").value = today().slice(0, 7);
+  $("budget").value = budget > 0 ? budget : "";
+
+  $("addBtn").addEventListener("click", addExpense);
+  $("saveBudget").addEventListener("click", saveBudget);
+  $("exportBtn").addEventListener("click", exportCSV);
+  $("monthFilter").addEventListener("change", render);
+
+  render();
+</script>
+</body>
+</html>
